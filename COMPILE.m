@@ -2,8 +2,8 @@ function COMPILE
 
 % mex -g update_dist.cpp -DUSE_OPENMP COMPFLAGS="$COMPFLAGS /Qopenmp /Qansi_alias"
 % if ~isequal(exist('update_dist','file'),3)
-mex update_dist.cpp  -DUSE_OPENMP "C:\Program Files (x86)\Intel\Composer XE\mkl\lib\intel64\mkl_intel_lp64.lib" "C:\Program Files (x86)\Intel\Composer XE\mkl\lib\intel64\mkl_core.lib" "C:\Program Files (x86)\Intel\Composer XE\mkl\lib\intel64\mkl_intel_thread.lib" -I"C:\Program Files (x86)\Intel\Composer XE\mkl\include" -I"C:\Program Files (x86)\Intel\Composer XE 2013 SP1\compiler\include" COMPFLAGS="$COMPFLAGS /Qopenmp /Qansi_alias"
-mex trans_occ.cpp  -DUSE_OPENMP "C:\Program Files (x86)\Intel\Composer XE\mkl\lib\intel64\mkl_intel_lp64.lib" "C:\Program Files (x86)\Intel\Composer XE\mkl\lib\intel64\mkl_core.lib" "C:\Program Files (x86)\Intel\Composer XE\mkl\lib\intel64\mkl_intel_thread.lib" -I"C:\Program Files (x86)\Intel\Composer XE\mkl\include" -I"C:\Program Files (x86)\Intel\Composer XE 2013 SP1\compiler\include" COMPFLAGS="$COMPFLAGS /Qopenmp /Qansi_alias"
+% mex update_dist.cpp  -DUSE_OPENMP "C:\Program Files (x86)\Intel\Composer XE\mkl\lib\intel64\mkl_intel_lp64.lib" "C:\Program Files (x86)\Intel\Composer XE\mkl\lib\intel64\mkl_core.lib" "C:\Program Files (x86)\Intel\Composer XE\mkl\lib\intel64\mkl_intel_thread.lib" -I"C:\Program Files (x86)\Intel\Composer XE\mkl\include" -I"C:\Program Files (x86)\Intel\Composer XE 2013 SP1\compiler\include" COMPFLAGS="$COMPFLAGS /Qopenmp /Qansi_alias"
+% mex trans_occ.cpp  -DUSE_OPENMP "C:\Program Files (x86)\Intel\Composer XE\mkl\lib\intel64\mkl_intel_lp64.lib" "C:\Program Files (x86)\Intel\Composer XE\mkl\lib\intel64\mkl_core.lib" "C:\Program Files (x86)\Intel\Composer XE\mkl\lib\intel64\mkl_intel_thread.lib" -I"C:\Program Files (x86)\Intel\Composer XE\mkl\include" -I"C:\Program Files (x86)\Intel\Composer XE 2013 SP1\compiler\include" COMPFLAGS="$COMPFLAGS /Qopenmp /Qansi_alias"
 %{
 mex update_dist.cpp -DUSE_OPENMP COMPFLAGS="$COMPFLAGS /Qopenmp /Qansi_alias"
 mex trans_occ.cpp

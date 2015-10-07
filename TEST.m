@@ -1,21 +1,19 @@
-Params = SETUP;
-Params = COMMON(Params);
-v2struct(Params);
-load('VfiRslt');
-% VfiRslt =
-% VFI_SS(ZBar,RBar,WBar,TaxBar,TauLBar,TauRBar,TauPiBar,Params,VfiRslt.V,[]);
-VfiRslt = VFI_SS(ZBar,RBar,WBar,TaxBar,LambdaBar,TauLBar,TauRBar,TauPiBar,Params,VfiRslt.EV,[]);
-save('VfiRslt','VfiRslt');
-% load('SmltRslt');
-% SmltRslt = SIMULATE_SS(BondBar,GBar,VfiRslt,Params,SmltRslt.Dist,[]);
-SmltRslt = SIMULATE_SS(BBar,GBar,VfiRslt,Params,[],[]);
-% save('SmltRslt','SmltRslt');
+% collapse to state only
+bp = 4*EpsilonPts*ZetaPts*APts-1;
+yidx = [1:3*EpsilonPts*ZetaPts*APts bp+1:bp+8];
+OmegaIdx = [3*EpsilonPts*ZetaPts*APts+1:4*EpsilonPts*ZetaPts*APts-1 bp+9:bp+12];
 
-LambdaBar = LambdaBar+1e-5;
-VfiRslt2 = VFI_SS(ZBar,RBar,WBar,TaxBar,LambdaBar,TauLBar,TauRBar,TauPiBar,Params,VfiRslt.EV,[]);
-SmltRslt2 = SIMULATE_SS(BBar,GBar,VfiRslt2,Params,[],[]);
+D = C(yidx);
+F = G1(yidx,OmegaIdx);
 
-Params = SETUP;
-Params = COMMON(Params);
-v2struct(Params);
-% RIdx = (EpsilonPts*ZetaPts*APts)*(1+2
+C1 = C(OmegaIdx);
+A1 = G1(OmegaIdx,OmegaIdx);
+A2 = G1(OmegaIdx,yidx);
+
+C2 = C1+A2*D;
+A = A1+A2*F;
+
+% eigen vector of A C2
+SsNew = (eye(size(A,1))-A)\C2;
+save('sys_helper','sys_helper');
+SsOmega = Ss(OmegaIdx);

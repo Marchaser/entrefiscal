@@ -92,7 +92,7 @@ Dist = [];
         end
         
         display('Simulate...');
-        SmltRslt = SIMULATE_SS(BBar,GBar,VfiRslt,NewParams,Dist,[]);
+        SmltRslt = SIMULATE_SS(NewParams.ZBar,BBar,GBar,VfiRslt,NewParams,Dist,[]);
         if ~IsComputingDiff
             Dist = SmltRslt.Dist;
         end

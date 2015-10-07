@@ -53,9 +53,9 @@ while(Err > TolVfi && count < IterMax)
     %}
     %{
     AMklPp.breaks = {AGrid};
-    AMklPp.order = int32(4);
+    AMklPp.order = int32(2);
     AMklPp.dim = int32(EpsilonPts*ZetaPts);
-    AMklPp.coefs = myppualMKL_CMEX(int32(-NumOfThreads), {AGrid}, permute(reshape(EV, [], APts),[2 1]), [], int32([4]), int32(EpsilonPts*ZetaPts), [], [], [], [], []);
+    AMklPp.coefs = myppualMKL_CMEX(int32(-NumOfThreads), {AGrid}, permute(reshape(EV, [], APts),[2 1]), [], int32([2]), int32(EpsilonPts*ZetaPts), [], [], [], [], []);
     %}
     
     % worker's problem
@@ -95,13 +95,13 @@ while(Err > TolVfi && count < IterMax)
     %}
 end
 % OccPolicy = exp(VManager) ./ (exp(VManager)+exp(VWorker));
-VManagerSmall = min(VManager(CManager>0));
-VManager(CManager<0) = VManagerSmall;
+% VManagerSmall = min(VManager(CManager>0));
+% VManager(CManager<0) = VManagerSmall-100;
 OccPolicy = normcdf((VManager-VWorker)/USigma);
 OccPolicy = reshape(OccPolicy, EpsilonPts, ZetaPts, APts);
 % OccPolicy(CManager<0) = 0;
+% CManager(CManager<0) = 0;
 OccPolicy(:,1,:) = 0;
-
 
 ApWorker = PolicyWorker(1,:);
 NWorker = PolicyWorker(2,:);

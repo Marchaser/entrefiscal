@@ -1,17 +1,33 @@
-function SmltRslt = SIMULATE_SS(bond,gov,VfiRslt,Params,Dist,IterMax)
+function SmltRslt = SIMULATE_SS(z,bond,gov,VfiRslt,Params,Distl,IterMax)
 v2struct(Params);
 v2struct(VfiRslt);
 
+%{
 FullPp = tensor_pchip({AGrid}, cat(1,...
     reshape(ApWorker, 1, EpsilonPts, ZetaPts, APts), ...
     reshape(ApManager, 1, EpsilonPts, ZetaPts, APts)));
 FullPp = myppual(FullPp);
+%}
+FullData = cat(1,...
+    reshape(ApWorker, 1, EpsilonPts, ZetaPts, APts), ...
+    reshape(ApManager, 1, EpsilonPts, ZetaPts, APts));
+FullData = reshape(FullData, [], APts);
+FullPp = tensor_pchip({AGrid}, FullData);
+FullPp = myppual(FullPp);
+%{
+pp = struct('form','MKLpp','breaks',{AGrid},...
+    'Values',FullData,'coefs',[],'order',[2],...
+    'Method',[],'ExtrapolationOrder',[],'thread',8,...
+    'orient','curvefit');
+FullPp = myppual(pp);
+%}
 
-if isequal(Dist,[])
-    Dist = 1/EpsilonPts/ZetaPts/APts * ones(EpsilonPts, ZetaPts, APts);
+if isequal(Distl,[])
+    Distl = 1/EpsilonPts/ZetaPts/APts * ones(EpsilonPts, ZetaPts, APts);
 end
 
-ApInterp = myppualMKL_CMEX(int32(NumOfThreads), {AGrid}, FullPp.coefs, [], int32([4]), int32(2*EpsilonPts*ZetaPts), [], [AGrid(:)'], [], [], []);
+ApInterp = myppual(FullPp,AGrid(:)',[],[]);
+% ApInterp = myppualMKL_CMEX(int32(NumOfThreads), {AGrid}, FullPp.coefs, [], int32([2]), int32(2*EpsilonPts*ZetaPts), [], [AGrid(:)'], [], [], []);
 ApInterp = reshape(ApInterp, 2, EpsilonPts, ZetaPts, APts);
 ApInterp = min(max(ApInterp,AMin),AMax);
 [~,ApCell] = histc(ApInterp,AGrid);
@@ -28,57 +44,57 @@ ApManagerCellInt = int32(ApManagerCell)-1;
 
 Err = 1;
 count = 0;
-while (Err>TolEqSs)
+if isequal(IterMax,[])
+    IterMax = inf;
+end
+Dist = Distl;
+while (Err>TolEqSs && count<IterMax)
     count = count+1;
+    
+    Distl = Dist;
+    Dist = update_dist(Distl,OccPolicy,ApManagerCellInt,ApWorkerCellInt,ApManagerLeftShare,ApWorkerLeftShare,EpsilonTrans,ZetaTrans);
 
+    Err = sum(abs(Dist(:)-Distl(:)));
     
-    TDist = update_dist(Dist,OccPolicy,ApManagerCellInt,ApWorkerCellInt,ApManagerLeftShare,ApWorkerLeftShare,EpsilonTrans,ZetaTrans);
-    
-    % update distribution
-    % prototype
-    Err = sum(abs(TDist(:)-Dist(:)));
-    Dist = TDist;
-    
-    if mod(count,100)==1
-        display(['Iter: ' num2str(count) ', Err: ' num2str(Err)]);
-    end
-    
-    if (Err<=TolEqSs)
+    if Params.ShowDetail==1
+        if mod(count,100)==1
+            display(['Iter: ' num2str(count) ', Err: ' num2str(Err)]);
+        end
     end
 end
 
-ADist = sum(reshape(Dist,[],APts));
-AGini = gini_dist(ADist,AGrid);
-Ks = sum(Dist(:).*AMesh(:));
-Kd = sum(Dist(:).*OccPolicy(:).*KManager(:));
+Ks = sum(Distl(:).*AMesh(:));
+Kd = sum(Distl(:).*OccPolicy(:).*KManager(:));
 K = Ks - Kd - bond;
-Nd = sum(Dist(:).*OccPolicy(:).*NManager(:));
-Ns = sum(Dist(:).*(1-OccPolicy(:)).*NWorker(:).*EpsilonMesh(:));
+Nd = sum(Distl(:).*OccPolicy(:).*NManager(:));
+Ns = sum(Distl(:).*(1-OccPolicy(:)).*NWorker(:).*EpsilonMesh(:));
 N = Ns - Nd;
 KLRatio = K/N;
-r = Gamma*KLRatio^(Gamma-1)-Delta;
-w = (1-Gamma)*KLRatio^Gamma;
-EntrePopShare = sum(Dist(:).*OccPolicy(:));
+r = z*Gamma*KLRatio^(Gamma-1)-Delta;
+w = z*(1-Gamma)*KLRatio^Gamma;
+ADist = sum(reshape(Distl,[],APts));
+AGini = gini_dist(ADist,AGrid);
+EntrePopShare = sum(Distl(:).*OccPolicy(:));
 WorkerPopShare = 1-EntrePopShare;
-MeanHours = sum(Dist(:).*(1-OccPolicy(:)).*NWorker(:))/WorkerPopShare;
+MeanHours = sum(Distl(:).*(1-OccPolicy(:)).*NWorker(:))/WorkerPopShare;
 MeanNs = Ns/WorkerPopShare;
 MeanFirmSize = Nd/EntrePopShare/MeanNs;
 KShare = Kd/Ks;
 NShare = Nd/Ns;
 
 % employment distribution
-ManagerHasEmp = sum(Dist(:).*(NManager(:)/MeanNs>1).*OccPolicy(:));
-EmpSize1To5 = sum(Dist(:).*(NManager(:)/MeanNs<=5 & NManager(:)/MeanNs>1).*OccPolicy(:))/ManagerHasEmp;
-EmpSize5To10 = sum(Dist(:).*(NManager(:)/MeanNs<=10 & NManager(:)/MeanNs>5).*OccPolicy(:))/ManagerHasEmp;
-EmpSize10To20 = sum(Dist(:).*(NManager(:)/MeanNs<=20 & NManager(:)/MeanNs>10).*OccPolicy(:))/ManagerHasEmp;
-EmpSize20To100 = sum(Dist(:).*(NManager(:)/MeanNs<=100 & NManager(:)/MeanNs>20).*OccPolicy(:))/ManagerHasEmp;
-EmpSizeAbove100 = sum(Dist(:).*(NManager(:)/MeanNs>100).*OccPolicy(:))/ManagerHasEmp;
+ManagerHasEmp = sum(Distl(:).*(NManager(:)/MeanNs>1).*OccPolicy(:));
+EmpSize1To5 = sum(Distl(:).*(NManager(:)/MeanNs<=5 & NManager(:)/MeanNs>1).*OccPolicy(:))/ManagerHasEmp;
+EmpSize5To10 = sum(Distl(:).*(NManager(:)/MeanNs<=10 & NManager(:)/MeanNs>5).*OccPolicy(:))/ManagerHasEmp;
+EmpSize10To20 = sum(Distl(:).*(NManager(:)/MeanNs<=20 & NManager(:)/MeanNs>10).*OccPolicy(:))/ManagerHasEmp;
+EmpSize20To100 = sum(Distl(:).*(NManager(:)/MeanNs<=100 & NManager(:)/MeanNs>20).*OccPolicy(:))/ManagerHasEmp;
+EmpSizeAbove100 = sum(Distl(:).*(NManager(:)/MeanNs>100).*OccPolicy(:))/ManagerHasEmp;
 
-CE = sum(Dist(:).*CManager(:));
-CW = sum(Dist(:).*CWorker(:));
+CE = sum(Distl(:).*CManager(:));
+CW = sum(Distl(:).*CWorker(:));
 C = CE+CW;
-YE = sum(Dist(:).*YManager(:).*OccPolicy(:));
-YF = K^Gamma*N^(1-Gamma);
+YE = sum(Distl(:).*YManager(:).*OccPolicy(:));
+YF = z*K^Gamma*N^(1-Gamma);
 Y = YE+YF;
 KYRatio = Ks/Y;
 
@@ -86,6 +102,9 @@ KYRatio = Ks/Y;
 IE = Delta*Kd;
 IF = Delta*K;
 I = IE+IF;
+
+Tax = Rho0+Rho1*bond+Rho2*gov;
+Bp = bond*(1+r)+gov-Tax;
 
 % exit rate
 %{
@@ -108,7 +127,8 @@ for iE=1:EpsilonPts
 end
 %}
 SurvivalPolicy = trans_occ(OccPolicy,ApManagerCellInt,ApManagerLeftShare,EpsilonTrans,ZetaTrans);
-Survival = sum(Dist(:).*SurvivalPolicy(:).*OccPolicy(:))/EntrePopShare;
-SmltRslt = v2struct(Dist,Ks,K,Kd,Nd,Ns,N,KLRatio,r,w,YE,YF,Y,IE,IF,I,EntrePopShare,WorkerPopShare,MeanHours,MeanFirmSize,...
+Survival = sum(Distl(:).*SurvivalPolicy(:).*OccPolicy(:))/EntrePopShare;
+
+SmltRslt = v2struct(Dist,Ks,K,Kd,Nd,Ns,N,KLRatio,r,w,Tax,Bp,YE,YF,Y,IE,IF,I,EntrePopShare,WorkerPopShare,MeanHours,MeanFirmSize,...
     AGini,KShare,NShare,Survival,KYRatio,EmpSize1To5,EmpSize5To10,EmpSize10To20,EmpSize20To100,EmpSizeAbove100);
 end

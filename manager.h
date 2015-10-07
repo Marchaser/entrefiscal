@@ -58,7 +58,7 @@ USER_FUNC_HEAD
 
 	double c = budget - ap;
 	double u;
-	double cLow = 1e-6;
+	double cLow = 1e-3;
 	double uAtCLow = pow(cLow, chi*(1 - sigma)) / (1 - sigma);
 	double upAtCLow = chi*(1 - sigma)*uAtCLow / cLow;
 	if (c > cLow)

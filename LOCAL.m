@@ -4,48 +4,55 @@ global SysEvalTimes;
 SysEvalTimes = 0;
 Params = COMMON(Params);
 v2struct(Params);
-global VfiRsltSs VSs VWorkerSs VManagerSs zSs rSs wSs TaxSs LambdaSs DistSs
+global VfiRsltSs SmltRsltSs EVSs VWorkerSs VManagerSs zSs rSs wSs TaxSs LambdaSs DistSs GSs BSs
 
 load('VfiRslt');
+Params.TolOpt = eps;
+Params.TolVfi = 1e-12;
+Params.TolEqSs = eps;
+Params.ShowDetail = 1;
 VfiRsltSs = VFI_SS(ZBar,RBar,WBar,TaxBar,LambdaBar,TauLBar,TauRBar,TauPiBar,Params,VfiRslt.EV,[]);
-SmltRslt = SIMULATE_SS(BBar,GBar,VfiRsltSs,Params,[],[]);
+SmltRsltSs = SIMULATE_SS(ZBar,BBar,GBar,VfiRsltSs,Params,[],[]);
+Params.ShowDetail = 0;
 
-VSs = VfiRsltSs.V;
+EVSs = VfiRsltSs.EV;
 VWorkerSs = VfiRsltSs.VWorker;
 VManagerSs = VfiRsltSs.VManager;
 zSs = ZBar;
-DistSs = SmltRslt.Dist;
-rSs = SmltRslt.r;
-wSs = SmltRslt.w;
+DistSs = SmltRsltSs.Dist;
+% DistSs(1) = 1-sum(DistSs(2:end));
+rSs = SmltRsltSs.r;
+wSs = SmltRsltSs.w;
 TaxSs = TaxBar;
 LambdaSs = LambdaBar;
+GSs = GBar;
+BSs = BBar;
 
-Ks = SmltRslt.Ks;
-Kd = SmltRslt.Kd;
-K = SmltRslt.K;
-Ns = SmltRslt.Ns;
-Nd = SmltRslt.Nd;
-N = SmltRslt.N;
-r = SmltRslt.r;
-w = SmltRslt.w;
+Ks = SmltRsltSs.Ks;
+Kd = SmltRsltSs.Kd;
+K = SmltRsltSs.K;
+Ns = SmltRsltSs.Ns;
+Nd = SmltRsltSs.Nd;
+N = SmltRsltSs.N;
+r = SmltRsltSs.r;
+w = SmltRsltSs.w;
 Tax = TaxBar;
 B = BBar;
 z = ZBar;
 G = GBar;
 Lambda = LambdaBar;
-IE = SmltRslt.IE;
-IF = SmltRslt.IF;
-I = SmltRslt.I;
-YE = SmltRslt.YE;
-YF = SmltRslt.YF;
-Y = SmltRslt.Y;
-EntrePopShare = SmltRslt.EntrePopShare;
+IE = SmltRsltSs.IE;
+IF = SmltRsltSs.IF;
+I = SmltRsltSs.I;
+YE = SmltRsltSs.YE;
+YF = SmltRsltSs.YF;
+Y = SmltRsltSs.Y;
+EntrePopShare = SmltRsltSs.EntrePopShare;
 
-SsOthers = [Ks Kd K Ns Nd N r w Tax B z G Lambda];
-SsOthers = [SsOthers IE IF I];
-SsOthers = [SsOthers YE YF Y EntrePopShare];
-% SsOthers = log(SsOthers);
-Ss = [VSs(:)' VWorkerSs(:)' VManagerSs(:)' DistSs(:)' SsOthers];
+Ss = [DistSs(:)' z G Lambda B];
+Ss = [Ss VWorkerSs(:)' VManagerSs(:)'];
+% Ss = [Ss Ks Kd K Ns Nd N r w];
+Ss = [Ss r w];
 nx = length(Ss);
 nepsilon = 3;
 neta = 2*EpsilonPts*ZetaPts*APts;
@@ -55,18 +62,27 @@ display(max(abs(F(:))));
 
 Epsilon0 = zeros(1,nepsilon);
 Eta0 = zeros(1,neta);
-tic;
 
-TypicalX = max(abs([Ss Ss ones(1,nepsilon) ones(1,neta)]),1e-2);
+tic;
+TypicalX = [max(DistSs(:))*ones(1,EpsilonPts*ZetaPts*APts) z G Lambda B];
+TypicalX = [TypicalX VWorkerSs(:)' VManagerSs(:)'];
+TypicalX = [TypicalX r w];
+TypicalX = [TypicalX TypicalX ones(1,nepsilon) ones(1,neta)];
+% TypicalX = [ones(1,2*nx) ones(1,nepsilon) ones(1,neta)];
+RelDeltaX = [1e-3*ones(1,EpsilonPts*ZetaPts*APts) 1e-3 1e-3 1e-3 1e-3];
+RelDeltaX = [RelDeltaX 1e-4*ones(1,2*EpsilonPts*ZetaPts*APts)];
+RelDeltaX = [RelDeltaX 1e-3*ones(1,2)];
+RelDeltaX = [RelDeltaX RelDeltaX ones(1,nepsilon) ones(1,neta)];
+assert(numel(TypicalX)==numel(RelDeltaX));
 [F,Fp] = AutoDiff(@(x) sys_stack([x(1:nx) x(nx+1:2*nx) x(2*nx+1:2*nx+nepsilon) x(2*nx+nepsilon+1:2*nx+nepsilon+neta)], ...
-    nx,nepsilon,neta,Params),[Ss Ss Epsilon0 Eta0],1e-5,'central',TypicalX);
+    nx,nepsilon,neta,Params),[Ss Ss Epsilon0 Eta0],RelDeltaX,'central',TypicalX);
 toc;
 
 % call gensys
 g0 = Fp(:,1:nx);
 g1 = -Fp(:,nx+1:2*nx);
 psi = -Fp(:,2*nx+1:2*nx+nepsilon);
-pi = -Fp(:,2*nx+nepsilon+1:end);
+pi = -Fp(:,2*nx+nepsilon+1:2*nx+nepsilon+neta);
 c = (Fp(:,1:nx)+Fp(:,nx+1:2*nx))*Ss';
 
 t2 = tic;
@@ -83,8 +99,8 @@ for t=1:T
 end
 
 IRF2 = IRF0;
-IRF2(:,9) = IRF2(:,9) + impact(:,2);
-for t=9:T
+IRF2(:,1) = IRF2(:,1) + impact(:,2);
+for t=1:T
     IRF2(:,t+1) = G1*IRF2(:,t)+C;
 end
 
@@ -94,13 +110,24 @@ for t=1:T
     IRF3(:,t+1) = G1*IRF3(:,t)+C;
 end
 
-IRFLambda1 = IRF3;
-IRFLambda1(:,9) = IRF3(:,9) + impact(:,2);
-for t=9:T
-    IRFLambda1(:,t+1) = G1*IRFLambda1(:,t)+C;
-end
+% convert coefficients to canonical form
+bp = EpsilonPts*ZetaPts*APts-1 + 4;
+yidx = [bp+1:length(Ss)];
+OmegaIdx = [1:bp];
 
-save sys.mat Ss g0 g1 psi pi c F Fp G1 C impact fmat fwt ywt gev eu loose IRF1 IRF2 IRF3
+D = C(yidx);
+F = G1(yidx,OmegaIdx);
+
+C1 = C(OmegaIdx);
+A1 = G1(OmegaIdx,OmegaIdx);
+A2 = G1(OmegaIdx,yidx);
+
+C2 = C1+A2*D;
+A = A1+A2*F;
+
+SsOmega = (eye(size(A,1))-A)\C2;
+
+save sys.mat Ss g0 g1 psi pi c F Fp G1 C impact fmat fwt ywt gev eu loose IRF1 IRF2 IRF3 D F A1 A2 C1 C2 A yidx OmegaIdx SsOmega
 end
 
 function FStack = sys_stack(x,nx,nepsilon,neta,Params)
@@ -120,11 +147,38 @@ end
 v2struct(Params);
 
 bp = 1;
-V = X(bp:bp+EpsilonPts*ZetaPts*APts-1);
-V = reshape(V,EpsilonPts,ZetaPts,APts);
-Vl = Xl(bp:bp+EpsilonPts*ZetaPts*APts-1);
-Vl = reshape(Vl,EpsilonPts,ZetaPts,APts);
+
+Dist = zeros(EpsilonPts,ZetaPts,APts);
+Dist(:) = X(bp:bp+EpsilonPts*ZetaPts*APts-1);
+% Dist(1) = 1-sum(Dist(2:end));
+Distl = zeros(EpsilonPts,ZetaPts,APts);
+Distl(:) = Xl(bp:bp+EpsilonPts*ZetaPts*APts-1);
+% Distl(1) = 1-sum(Distl(2:end));
 bp = bp + EpsilonPts*ZetaPts*APts;
+
+z = X(bp);
+zl = Xl(bp);
+bp = bp+1;
+
+G = X(bp);
+Gl = Xl(bp);
+bp = bp+1;
+
+Lambda = X(bp);
+Lambdal = Xl(bp);
+bp = bp+1;
+
+B = X(bp);
+Bl = Xl(bp);
+bp = bp+1;
+
+%{
+EV = X(bp:bp+EpsilonPts*ZetaPts*APts-1);
+EV = reshape(EV,EpsilonPts,ZetaPts,APts);
+EVl = Xl(bp:bp+EpsilonPts*ZetaPts*APts-1);
+EVl = reshape(EVl,EpsilonPts,ZetaPts,APts);
+bp = bp + EpsilonPts*ZetaPts*APts;
+%}
 
 VWorker = X(bp:bp+EpsilonPts*ZetaPts*APts-1);
 VWorker = reshape(VWorker,EpsilonPts,ZetaPts,APts);
@@ -138,18 +192,7 @@ VManagerl = Xl(bp:bp+EpsilonPts*ZetaPts*APts-1);
 VManagerl = reshape(VManagerl,EpsilonPts,ZetaPts,APts);
 bp = bp + EpsilonPts*ZetaPts*APts;
 
-Dist = X(bp:bp+EpsilonPts*ZetaPts*APts-1);
-Dist = reshape(Dist,[EpsilonPts ZetaPts APts]);
-Distl = Xl(bp:bp+EpsilonPts*ZetaPts*APts-1);
-Distl = reshape(Distl,[EpsilonPts ZetaPts APts]);
-bp = bp + EpsilonPts*ZetaPts*APts;
-
 %{
-% log from here below
-X(bp:end) = exp(X(bp:end));
-Xl(bp:end) = exp(Xl(bp:end));
-%}
-
 Ks = X(bp);
 Ksl = Xl(bp);
 bp = bp+1;
@@ -173,6 +216,7 @@ bp = bp+1;
 N = X(bp);
 Nl = Xl(bp);
 bp = bp+1;
+%}
 
 r = X(bp);
 rl = Xl(bp);
@@ -182,197 +226,96 @@ w = X(bp);
 wl = Xl(bp);
 bp = bp+1;
 
-Tax = X(bp);
-Taxl = Xl(bp);
-bp = bp+1;
-
-B = X(bp);
-Bl = Xl(bp);
-bp = bp+1;
-
-z = X(bp);
-zl = Xl(bp);
-bp = bp+1;
-
-G = X(bp);
-Gl = Xl(bp);
-bp = bp+1;
-
-Lambda = X(bp);
-Lambdal = Xl(bp);
-bp = bp+1;
-
-IE = X(bp);
-IEl = Xl(bp);
-bp = bp+1;
-
-IF = X(bp);
-IFl = Xl(bp);
-bp = bp+1;
-
-I = X(bp);
-Il = Xl(bp);
-bp = bp+1;
-
-YE = X(bp);
-YEl = Xl(bp);
-bp = bp+1;
-
-YF = X(bp);
-YFl = Xl(bp);
-bp = bp+1;
-
-Y = X(bp);
-Yl = Xl(bp);
-bp = bp+1;
-
-EntrePopShare = X(bp);
-EntrePopSharel = Xl(bp);
-bp = bp+1;
-
 assert(bp==length(X)+1);
+Taxl = Rho0 + Rho1*Bl + Rho2*Gl;
 
-% EV = Beta*EpsilonZetaTrans * reshape(V, EpsilonPts*ZetaPts, APts);
-% VfiResult = VFI_SS(zl,rl,wl,Taxl,Lambdal,TauLBar,TauRBar,TauPiBar,Params,EV,1);
-global VSs zSs rSs wSs TaxSs LambdaSs VfiRsltSs DistSs
-if ~(isequal(V,VSs) && isequal(zl,zSs) && isequal(rl,rSs) && isequal(wl,wSs) && isequal(Taxl,TaxSs) && isequal(Lambdal,LambdaSs))
-    %% solve maximization problem
-    EV = Beta*EpsilonZetaTrans * reshape(V, EpsilonPts*ZetaPts, APts);
+% VfiRslt = VFI_SS(zl,rl,wl,Taxl,Lambdal,TauLBar,TauRBar,TauPiBar,Params,EV,1);
+global VWorkerSs VManagerSs zSs rSs wSs TaxSs LambdaSs VfiRsltSs DistSs
+if ~(isequal(VWorker,VWorkerSs) && isequal(VManager,VManagerSs) && isequal(zl,zSs) && isequal(rl,rSs) && isequal(wl,wSs) && isequal(Taxl,TaxSs) && isequal(Lambdal,LambdaSs))
+    EV = VManager + normcdf((VWorker-VManager)/USigma).*(VWorker-VManager) ...
+        +USigma*normpdf((VWorker-VManager)/USigma);
+    EV = reshape(EV,EpsilonPts,ZetaPts,APts);
+    EV(:,1,:) = VWorker(:,1,:);
+    EV = Beta*EpsilonZetaTrans * reshape(EV, EpsilonPts*ZetaPts, APts);
+    EV = reshape(EV,EpsilonPts,ZetaPts,APts);
+    % solve maximization problem
+    % EV = Beta*EpsilonZetaTrans * reshape(V, EpsilonPts*ZetaPts, APts);
     VfiRslt = VFI_SS(zl,rl,wl,Taxl,Lambdal,TauLBar,TauRBar,TauPiBar,Params,EV,1);
 else
     VfiRslt = VfiRsltSs;
 end
-%}
-
-T_VWorkerl = VfiRslt.VWorker;
-T_VManagerl = VfiRslt.VManager;
-OccPolicy = VfiRslt.OccPolicy;
 
 %% update dist
-FullPp = tensor_pchip({AGrid}, cat(1,...
-    reshape(VfiRslt.ApWorker, 1, EpsilonPts, ZetaPts, APts), ...
-    reshape(VfiRslt.ApManager, 1, EpsilonPts, ZetaPts, APts)));
-FullPp = myppual(FullPp);
-
-ApInterp = myppualMKL_CMEX(int32(NumOfThreads), {AGrid}, FullPp.coefs, [], int32([4]), int32(2*EpsilonPts*ZetaPts), [], [AGrid(:)'], [], [], []);
-ApInterp = reshape(ApInterp, 2, EpsilonPts, ZetaPts, APts);
-ApInterp = min(max(ApInterp,AMin),AMax);
-[~,ApCell] = histc(ApInterp,AGrid);
-ApCell = min(ApCell,APts-1);
-ApLeftShare = (AGrid(ApCell+1)-ApInterp) ./ (AGrid(ApCell+1)-AGrid(ApCell));
-
-ApWorkerCell = reshape(ApCell(1,:),EpsilonPts,ZetaPts,APts);
-ApManagerCell = reshape(ApCell(2,:),EpsilonPts,ZetaPts,APts);
-ApWorkerLeftShare = reshape(ApLeftShare(1,:),EpsilonPts,ZetaPts,APts);
-ApManagerLeftShare = reshape(ApLeftShare(2,:),EpsilonPts,ZetaPts,APts);
-
-ApWorkerCellInt = int32(ApWorkerCell)-1;
-ApManagerCellInt = int32(ApManagerCell)-1;
-
-% T_Dist = update_dist(Distl,OccPolicy,ApManagerCellInt,ApWorkerCellInt,ApManagerLeftShare,ApWorkerLeftShare,EpsilonTrans,ZetaTrans);
-if ~(isequal(VfiRslt,VfiRsltSs) && isequal(Distl,DistSs))
-    T_Dist = update_dist(Distl,OccPolicy,ApManagerCellInt,ApWorkerCellInt,ApManagerLeftShare,ApWorkerLeftShare,EpsilonTrans,ZetaTrans);
+% SmltRslt = SIMULATE_SS(zl,Bl,Gl,VfiRslt,Params,Distl,1);
+global SmltRsltSs BSs GSs;
+if ~(isequal(VfiRslt,VfiRsltSs) && isequal(Distl,DistSs) && isequal(zl,zSs) && isequal(Bl,BSs) && isequal(Gl,GSs))
+    SmltRslt = SIMULATE_SS(zl,Bl,Gl,VfiRslt,Params,Distl,1);
 else
-    T_Dist = DistSs;
+    SmltRslt = SmltRsltSs;
 end
 %}
 
 %% input to system of equations
 bp = 1;
-T_Vl = VManagerl + normcdf((VWorkerl-VManagerl)/USigma).*(VWorkerl-VManagerl) ...
-    +USigma*normpdf((VWorkerl-VManagerl)/USigma);
-T_Vl = reshape(T_Vl,EpsilonPts,ZetaPts,APts);
-T_Vl(:,1,:) = VWorkerl(:,1,:);
-F(bp:bp+EpsilonPts*ZetaPts*APts-1) = reshape(T_Vl-Vl,1,[]);
+
+F(bp:bp+EpsilonPts*ZetaPts*APts-1) = reshape(SmltRslt.Dist-Dist,1,[]);
 bp = bp+EpsilonPts*ZetaPts*APts;
 
-F(bp:bp+EpsilonPts*ZetaPts*APts-1) = reshape(T_VWorkerl-VWorkerl,1,[])+eta(1:EpsilonPts*ZetaPts*APts);
-bp = bp+EpsilonPts*ZetaPts*APts;
-
-F(bp:bp+EpsilonPts*ZetaPts*APts-1) = reshape(T_VManagerl-VManagerl,1,[])+eta(EpsilonPts*ZetaPts*APts+1:2*EpsilonPts*ZetaPts*APts);
-bp = bp+EpsilonPts*ZetaPts*APts;
-
-F(bp:bp+EpsilonPts*ZetaPts*APts-1) = reshape(T_Dist-Dist,1,[]);
-bp = bp+EpsilonPts*ZetaPts*APts;
-
-%19
-F(bp) = Ksl - sum(Distl(:).*AMesh(:));
-bp = bp+1;
-
-%18
-F(bp) = Kdl - sum(Distl(:).*OccPolicy(:).*VfiRslt.KManager(:));
-bp = bp+1;
-
-%17
-F(bp) = Kl - (Ksl-Bl-Kdl);
-bp = bp+1;
-
-%16
-F(bp) = Nsl - sum(Distl(:).*(1-OccPolicy(:)).*VfiRslt.NWorker(:).*EpsilonMesh(:));
-bp = bp+1;
-
-%15
-F(bp) = Ndl - sum(Distl(:).*OccPolicy(:).*VfiRslt.NManager(:));
-bp = bp+1;
-
-%14
-F(bp) = Nl - (Nsl-Ndl);
-bp = bp+1;
-
-%13
-KLRatiol = Kl/Nl;
-F(bp) = rl - (zl*Gamma*KLRatiol^(Gamma-1)-Delta);
-bp = bp+1;
-
-%12
-F(bp) = wl - zl*(1-Gamma)*KLRatiol^Gamma;
-bp = bp+1;
-
-%11
-F(bp) = Taxl - (Rho0+Rho1*Bl+Rho2*Gl);
-bp = bp+1;
-
-%10
-F(bp) = B - (Bl*(1+rl)+Gl-Taxl);
-bp = bp+1;
-
-%9
 F(bp) = log(z) - (ZRho*log(zl)+epsilon(1));
 bp = bp+1;
 
-%8
 F(bp) = G - (GRho*Gl+(1-GRho)*GBar+epsilon(2));
 bp = bp+1;
 
-%7
 F(bp) = Lambda - (LambdaRho*Lambdal+(1-LambdaRho)*LambdaBar+epsilon(3));
 bp = bp+1;
 
-%6
-F(bp) = IE - (Kd-(1-Delta)*Kdl);
+F(bp) = B - (Bl*(1+rl)+Gl-Taxl);
 bp = bp+1;
 
-%5
-F(bp) = IF - (K-(1-Delta)*Kl);
+%{
+T_EVl = VManagerl + normcdf((VWorkerl-VManagerl)/USigma).*(VWorkerl-VManagerl) ...
+    +USigma*normpdf((VWorkerl-VManagerl)/USigma);
+T_EVl = reshape(T_EVl,EpsilonPts,ZetaPts,APts);
+T_EVl(:,1,:) = VWorkerl(:,1,:);
+T_EVl = Beta*EpsilonZetaTrans * reshape(T_EVl, EpsilonPts*ZetaPts, APts);
+T_EVl = reshape(T_EVl,EpsilonPts,ZetaPts,APts);
+F(bp:bp+EpsilonPts*ZetaPts*APts-1) = reshape(T_EVl-EVl,1,[]);
+bp = bp+EpsilonPts*ZetaPts*APts;
+%}
+
+F(bp:bp+EpsilonPts*ZetaPts*APts-1) = reshape(VfiRslt.VWorker-VWorkerl,1,[])+eta(1:EpsilonPts*ZetaPts*APts);
+bp = bp+EpsilonPts*ZetaPts*APts;
+
+F(bp:bp+EpsilonPts*ZetaPts*APts-1) = reshape(VfiRslt.VManager-VManagerl,1,[])+eta(EpsilonPts*ZetaPts*APts+1:2*EpsilonPts*ZetaPts*APts);
+bp = bp+EpsilonPts*ZetaPts*APts;
+
+%{
+F(bp) = Ksl - SmltRslt.Ks;
 bp = bp+1;
 
-%4
-F(bp) = I - (IE+IF);
+F(bp) = Kdl - SmltRslt.Kd;
 bp = bp+1;
 
-%3
-F(bp) = YEl - sum(Distl(:).*VfiRslt.YManager(:).*OccPolicy(:));
+F(bp) = Kl - SmltRslt.K;
 bp = bp+1;
 
-%2
-F(bp) = YFl - zl*Kl^Gamma*Nl^(1-Gamma);
+F(bp) = Nsl - SmltRslt.Ns;
 bp = bp+1;
 
-%1
-F(bp) = Yl - (YEl+YFl);
+F(bp) = Ndl - SmltRslt.Nd;
 bp = bp+1;
 
-%
-F(bp) = EntrePopSharel - sum(Distl(:).*VfiRslt.OccPolicy(:));
+F(bp) = Nl - SmltRslt.N;
+bp = bp+1;
+%}
+
+KLRatiol = SmltRslt.K/SmltRslt.N;
+T_rl = zl*Gamma*KLRatiol^(Gamma-1)-Delta;
+T_wl = zl*(1-Gamma)*KLRatiol^Gamma;
+F(bp) = rl - T_rl;
+bp = bp+1;
+
+F(bp) = wl - T_wl;
 bp = bp+1;
 end

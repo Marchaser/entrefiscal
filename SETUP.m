@@ -64,12 +64,13 @@ EntreShock2 = 0.9808;
 
 % computation
 NumOfThreads = 8;
-TolOpt = 1e-12;
-TolVfi = 1e-8;
-TolEqSs = 1e-8;
+TolOpt = 1e-14;
+TolVfi = 1e-12;
+TolEqSs = 1e-12;
 ShowDetail = 0;
 
-CaliX0 = [0.980795682546104    0.0223    0.2914    0.0025    0.9760    0.2388    0.5826    0.3264 ...
+% Beta = 0.979679791267919;
+CaliX0 = [0.980795702795628    0.0223    0.2914    0.0025    0.9760    0.2388    0.5826    0.3264 ...
     0.7600    1.2119    1.6424    0.2614];
 x = CaliX0;
 Beta = x(1);
@@ -86,7 +87,7 @@ BBar = x(11);
 GBar = x(12);
 clear x;
 
-Beta = 0.981610878232992;
+% Beta = 0.981610878232992;
 
 Params = v2struct;
 end
