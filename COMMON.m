@@ -28,7 +28,7 @@ EpsilonZetaTrans = kron(ZetaTrans,EpsilonTrans);
 
 % wealth grid
 AKsGrid = csvread('points.kgd');
-AKsGrid = AKsGrid - AKsGrid(1) + 1e-3;
+AKsGrid = AKsGrid - AKsGrid(1) + 1e-1;
 
 % AGrid = AKsGrid(1:6:end)/5;
 AGrid = AKsGrid(1:10:end)/10;

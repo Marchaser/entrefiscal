@@ -33,10 +33,10 @@ RBar = 0.05/4;
 % Shock
 % Aggregate
 ZBar = 1;
-ZRho = 0.9;
-ZSigma = 0.01;
+ZRho = 0.75;
+ZSigma = 0.012;
 % G
-GRho = 0.89;
+GRho = 0.8909;
 GSigma = 0.02;
 GBar = 0.20;
 BBar = 0.3597*4;
@@ -44,8 +44,8 @@ Rho1 = 0.017;
 Rho2 = 0.484;
 % Lambda
 LambdaBar = 2.14;
-LambdaRho = 0.9;
-LambdaSigma = 0.1;
+LambdaRho = 0.9170;
+LambdaSigma = 0.049;
 
 % Epsilon
 EpsilonPts = 3;
@@ -70,21 +70,20 @@ TolEqSs = 1e-12;
 ShowDetail = 0;
 
 % Beta = 0.979679791267919;
-CaliX0 = [0.980795702795628    0.0223    0.2914    0.0025    0.9760    0.2388    0.5826    0.3264 ...
-    0.7600    1.2119    1.6424    0.2614];
+CaliX0 = [0.980137707974586     0.020513      0.30921    0.0039207      0.97187      0.75967 ...
+    0.22786      0.76197       1.3213       1.6862      0.27075];
 x = CaliX0;
 Beta = x(1);
 Delta = x(2);
 Chi = x(3);
 EntreShock1 = x(4);
 EntreShock2 = x(5);
-USigma = x(6);
-ZetaMu = x(7);
-ZetaSigma = x(8);
-Theta = x(9);
-LambdaBar = x(10);
-BBar = x(11);
-GBar = x(12);
+ZetaMu = x(6);
+ZetaSigma = x(7);
+Theta = x(8);
+LambdaBar = x(9);
+BBar = x(10);
+GBar = x(11);
 clear x;
 
 % Beta = 0.981610878232992;

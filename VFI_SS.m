@@ -72,11 +72,13 @@ while(Err > TolVfi && count < IterMax)
     VManager = reshape(VManager,[EpsilonPts ZetaPts APts]);
     VWorker = reshape(VWorker,[EpsilonPts ZetaPts APts]);
     
+    %{
     V = VManager + normcdf((VWorker-VManager)/USigma).*(VWorker-VManager) ...
         +USigma*normpdf((VWorker-VManager)/USigma);
-    V(CManager<0) = VWorker(CManager<0);
     V(:,1,:) = VWorker(:,1,:);
-    % VMax = VWorker;
+    %}
+    V = VWorker + log(1 + exp(VManager-VWorker));
+    V(:,1,:) = VWorker(:,1,:);
     
     EVNew = Beta*EpsilonZetaTrans * reshape(V, EpsilonPts*ZetaPts, APts);
     Err = max(abs(EV(:)-EVNew(:)));
@@ -85,11 +87,6 @@ while(Err > TolVfi && count < IterMax)
     if Params.ShowDetail==1
         if mod(count,100)==1
             display(['Iter: ' num2str(count) ', Err: ' num2str(Err)]);
-            %{
-        if count>1000
-            1
-        end
-            %}
         end
     end
     %}
@@ -97,7 +94,8 @@ end
 % OccPolicy = exp(VManager) ./ (exp(VManager)+exp(VWorker));
 % VManagerSmall = min(VManager(CManager>0));
 % VManager(CManager<0) = VManagerSmall-100;
-OccPolicy = normcdf((VManager-VWorker)/USigma);
+% OccPolicy = normcdf((VManager-VWorker)/USigma);
+OccPolicy = 1 ./ (1+exp(VWorker-VManager));
 OccPolicy = reshape(OccPolicy, EpsilonPts, ZetaPts, APts);
 % OccPolicy(CManager<0) = 0;
 % CManager(CManager<0) = 0;

@@ -1,8 +1,8 @@
 function CALIBRATE(Params)
 x0 = Params.CaliX0;
-Params.TolOpt = 1e-8;
-Params.TolVfi = 1e-6;
-Params.TolEqSs = 1e-6;
+Params.TolOpt = 1e-10;
+Params.TolVfi = 1e-8;
+Params.TolEqSs = 1e-8;
 Params.ShowDetail = 1;
 %{
 x0(1) = Params.Beta;
@@ -26,7 +26,6 @@ bound = [
     0 1
     0 1
     0 1
-    1e-6 1
     -inf inf
     1e-6 1
     0 1
@@ -54,13 +53,12 @@ Dist = [];
         NewParams.Chi = x(3);
         NewParams.EntreShock1 = x(4);
         NewParams.EntreShock2 = x(5);
-        NewParams.USigma = x(6);
-        NewParams.ZetaMu = x(7);
-        NewParams.ZetaSigma = x(8);
-        NewParams.Theta = x(9);
-        NewParams.LambdaBar = x(10);
-        BBar = x(11);
-        GBar = x(12);
+        NewParams.ZetaMu = x(6);
+        NewParams.ZetaSigma = x(7);
+        NewParams.Theta = x(8);
+        NewParams.LambdaBar = x(9);
+        BBar = x(10);
+        GBar = x(11);
         Tax = BBar*Params.RBar + GBar;
         
         NewParams = COMMON(NewParams);
@@ -70,9 +68,8 @@ Dist = [];
             0.33
             0.0755
             0.81
-            4
             0.7568
-            0.8
+            0.146
             0.178
             0.218
             0.2086
@@ -103,9 +100,8 @@ Dist = [];
             SmltRslt.MeanHours
             SmltRslt.EntrePopShare
             SmltRslt.AGini
-            SmltRslt.MeanFirmSize
             SmltRslt.EmpSize1To5
-            SmltRslt.Survival
+            SmltRslt.EmpSize5To10
             SmltRslt.KShare
             SmltRslt.NShare
             Tax / SmltRslt.Y
@@ -115,13 +111,18 @@ Dist = [];
         display('Current Moments: ');
         display([ModelMoments;DataMoments]);
         MomentsMetric = (ModelMoments - DataMoments)./DataMoments;
+        %{
+        MomentsMetric(1) = MomentsMetric(1)*10;
+        MomentsMetric(4) = MomentsMetric(4)*10;
+        MomentsMetric(end-3:end-2) = MomentsMetric(end-3:end-2)*10;
+        %}
     end
 
 % options = [];
 % LastX = CoDoSol(x0', @(x) ComputeMomentsMetric(x)', XLb', XUb', [1e-6, 1e-6], options)';
 % fsolve(@(x) ComputeMomentsMetric(x)', x0', optimoptions('fsolve','Display','Iter','FinDiffRelStep',1e-3,'DiffMinChange',1e-6,'TypicalX',x0'));
 
-options = optimoptions('lsqnonlin','Display','Iter','FinDiffRelStep',1e-4,'DiffMinChange',1e-6,'TypicalX',x0');
+options = optimoptions('lsqnonlin','Display','Iter','FinDiffRelStep',1e-3,'DiffMinChange',1e-6,'TypicalX',x0');
 lsqnonlin(@(x)ComputeMomentsMetric(x)', x0', XLb', XUb', options);
 
 end

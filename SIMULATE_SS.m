@@ -79,16 +79,17 @@ WorkerPopShare = 1-EntrePopShare;
 MeanHours = sum(Distl(:).*(1-OccPolicy(:)).*NWorker(:))/WorkerPopShare;
 MeanNs = Ns/WorkerPopShare;
 MeanFirmSize = Nd/EntrePopShare/MeanNs;
+FirmSizeFactor = 4/MeanFirmSize;
 KShare = Kd/Ks;
 NShare = Nd/Ns;
 
 % employment distribution
-ManagerHasEmp = sum(Distl(:).*(NManager(:)/MeanNs>1).*OccPolicy(:));
-EmpSize1To5 = sum(Distl(:).*(NManager(:)/MeanNs<=5 & NManager(:)/MeanNs>1).*OccPolicy(:))/ManagerHasEmp;
-EmpSize5To10 = sum(Distl(:).*(NManager(:)/MeanNs<=10 & NManager(:)/MeanNs>5).*OccPolicy(:))/ManagerHasEmp;
-EmpSize10To20 = sum(Distl(:).*(NManager(:)/MeanNs<=20 & NManager(:)/MeanNs>10).*OccPolicy(:))/ManagerHasEmp;
-EmpSize20To100 = sum(Distl(:).*(NManager(:)/MeanNs<=100 & NManager(:)/MeanNs>20).*OccPolicy(:))/ManagerHasEmp;
-EmpSizeAbove100 = sum(Distl(:).*(NManager(:)/MeanNs>100).*OccPolicy(:))/ManagerHasEmp;
+ManagerHasEmp = sum(Distl(:).*(NManager(:)/MeanNs>0).*OccPolicy(:));
+EmpSize1To5 = sum(Distl(:).*(NManager(:)/MeanNs*FirmSizeFactor<=4 & NManager(:)/MeanNs*FirmSizeFactor>0).*OccPolicy(:))/ManagerHasEmp;
+EmpSize5To10 = sum(Distl(:).*(NManager(:)/MeanNs*FirmSizeFactor<=9 & NManager(:)/MeanNs*FirmSizeFactor>4).*OccPolicy(:))/ManagerHasEmp;
+EmpSize10To20 = sum(Distl(:).*(NManager(:)/MeanNs*FirmSizeFactor<=19 & NManager(:)/MeanNs*FirmSizeFactor>9).*OccPolicy(:))/ManagerHasEmp;
+EmpSize20To100 = sum(Distl(:).*(NManager(:)/MeanNs*FirmSizeFactor<=99 & NManager(:)/MeanNs*FirmSizeFactor>19).*OccPolicy(:))/ManagerHasEmp;
+EmpSizeAbove100 = sum(Distl(:).*(NManager(:)/MeanNs*FirmSizeFactor>99).*OccPolicy(:))/ManagerHasEmp;
 
 CE = sum(Distl(:).*CManager(:));
 CW = sum(Distl(:).*CWorker(:));
@@ -102,6 +103,16 @@ KYRatio = Ks/Y;
 IE = Delta*Kd;
 IF = Delta*K;
 I = IE+IF;
+
+% saving
+SW = sum(Distl(:).*ApWorker(:).*(1-OccPolicy(:)));
+SE = sum(Distl(:).*ApManager(:).*OccPolicy(:));
+MeanSW = SW/WorkerPopShare;
+MeanSE = SE/EntrePopShare;
+
+% profit
+Profit = sum(Distl(:).*PiManager(:).*OccPolicy(:));
+MeanProfit = Profit/EntrePopShare;
 
 Tax = Rho0+Rho1*bond+Rho2*gov;
 Bp = bond*(1+r)+gov-Tax;
@@ -126,9 +137,10 @@ for iE=1:EpsilonPts
     end
 end
 %}
-SurvivalPolicy = trans_occ(OccPolicy,ApManagerCellInt,ApManagerLeftShare,EpsilonTrans,ZetaTrans);
-Survival = sum(Distl(:).*SurvivalPolicy(:).*OccPolicy(:))/EntrePopShare;
+% SurvivalPolicy = trans_occ(OccPolicy,ApManagerCellInt,ApManagerLeftShare,EpsilonTrans,ZetaTrans);
+% Survival = sum(Distl(:).*SurvivalPolicy(:).*OccPolicy(:))/EntrePopShare;
 
 SmltRslt = v2struct(Dist,Ks,K,Kd,Nd,Ns,N,KLRatio,r,w,Tax,Bp,YE,YF,Y,IE,IF,I,EntrePopShare,WorkerPopShare,MeanHours,MeanFirmSize,...
-    AGini,KShare,NShare,Survival,KYRatio,EmpSize1To5,EmpSize5To10,EmpSize10To20,EmpSize20To100,EmpSizeAbove100);
+    AGini,KShare,NShare,KYRatio,EmpSize1To5,EmpSize5To10,EmpSize10To20,EmpSize20To100,EmpSizeAbove100,...
+    SW,SE,MeanSW,MeanSE,Profit,MeanProfit);
 end

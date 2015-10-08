@@ -1,4 +1,4 @@
-function SIMULATE(sys,T,shock,Params)
+function SimulateResult = SIMULATE(sys,T,shock,Params)
 Params = COMMON(Params);
 % Params.ShowDetail = 1;
 
@@ -35,10 +35,11 @@ ZBar = Params.ZBar;
 GBar = Params.GBar;
 LambdaBar = Params.LambdaBar;
 USigma = Params.USigma;
+KLRatioLast = Params.KLRatioBar;
 
     function Metric = getKLRatioMetric(KLRatio)
-        R = Gamma*KLRatio^(Gamma-1)-Delta;
-        W = (1-Gamma)*KLRatio^Gamma;
+        R = z(t)*Gamma*KLRatio^(Gamma-1)-Delta;
+        W = z(t)*(1-Gamma)*KLRatio^Gamma;
         % solve decision problem
         VfiRslt = VFI_SS(z(t),R,W,Tax(t),Lambda(t),TauLBar,TauRBar,TauPiBar,Params,EV,1);
         % simulate
@@ -48,8 +49,8 @@ USigma = Params.USigma;
     end
 
 Dist = zeros(EpsilonPts,ZetaPts,APts);
-% Dist(:) = Ss(1:EpsilonPts*ZetaPts*APts);
-% Ss(1) = 1 - sum(Dist(2:end));
+Dist(:) = Ss(1:EpsilonPts*ZetaPts*APts);
+Ss(1) = 1 - sum(Dist(2:end));
 Response(:,1) = Ss;
 for t=1:T
     % get states
@@ -73,41 +74,37 @@ for t=1:T
     % other endogenous varialbe directly computed
     Tax(t) = Rho0+Rho1*B(t)+Rho2*G(t);
 
-    bbp = bp; % base pointer from mother
+    bbp = bp; % base pointer from upper stack
     % predict future values
     Response(:,t+1) = G1*Response(:,t) + C;
     
-    VWorker = Response(bbp:bbp-1+EpsilonPts*ZetaPts*APts,t+1);
-    VWorker = reshape(VWorker,EpsilonPts,ZetaPts,APts);
-    bbp = bbp+EpsilonPts*ZetaPts*APts;
+    EV = Response(bbp:bbp-1+EpsilonPts*ZetaPts*APts,t+1);   
+    bbp = bbp+3*EpsilonPts*ZetaPts*APts;
+    EV = reshape(EV,EpsilonPts,ZetaPts,APts);
     
-    VManager = Response(bbp:bbp-1+EpsilonPts*ZetaPts*APts,t+1);
-    VManager = reshape(VManager,EpsilonPts,ZetaPts,APts);
-    bbp = bbp+EpsilonPts*ZetaPts*APts;
-    
+    %{
     r(t) = Response(bbp,t);
     bbp = bbp+1;
     w(t) = Response(bbp,t);
     bbp = bbp+1;
-    
-    EV = VManager + normcdf((VWorker-VManager)/USigma).*(VWorker-VManager) ...
-        +USigma*normpdf((VWorker-VManager)/USigma);
-    EV = reshape(EV,EpsilonPts,ZetaPts,APts);
-    EV(:,1,:) = VWorker(:,1,:);
-    EV = Beta*EpsilonZetaTrans * reshape(EV, EpsilonPts*ZetaPts, APts);
-    EV = reshape(EV,EpsilonPts,ZetaPts,APts);
+    %}
     
     % find KLRatio that clears market
-    % options = optimoptions('lsqnonlin','Display','iter','TolX',1e-8,'TolFun',1e-20);
+    %{
     options = optimset('Display','iter','TolX',eps);
     KLRatio = fzero(@getKLRatioMetric,[KLRatioMin,KLRatioMax],options);
     %}
+    options = optimset('Display','iter','DiffMinChange',1e-3);
+    Resi = 1;
+    init = KLRatioLast;
+    while (Resi>1e-2)
+        init = min(max(init+Params.KLRatioBar*randn,KLRatioMin),KLRatioMax);
+        [KLRatio,Resi] = fsolve(@getKLRatioMetric,init,options);
+    end
     %{
-    VfiRslt = VFI_SS(z(t),r(t),w(t),Tax(t),Lambda(t),TauLBar,TauRBar,TauPiBar,Params,EV,1);
-    SmltRslt = SIMULATE_SS(z(t),B(t),G(t),VfiRslt,Params,Dist,1);
+    KLRatio = CoDoSol(Params.KLRatioBar,@getKLRatioMetric,KLRatioMin,KLRatioMax,[1e-8 1e-8]);
     %}
     
-    % jump varialbe shoudln't mater. If it does, specify here.
     % get aggregates
     Ks(t) = SmltRslt.Ks;
     Kd(t) = SmltRslt.Kd;
@@ -120,10 +117,28 @@ for t=1:T
     YE(t) = SmltRslt.YE;
     YF(t) = SmltRslt.YF;
     Y(t) = SmltRslt.Y;
+    AGini(t) = SmltRslt.AGini;
     EntrePopShare(t) = SmltRslt.EntrePopShare;
+    KLRatioLast = K(t)/N(t);
+    Kp(t) = Kd(t)+K(t);
+    ZImplied(t) = Y(t)/(Kp(t)^Gamma*Ns(t)^(1-Gamma));
+    DistT{t} = Dist;
+    OccPolicyT{t} = VfiRslt.OccPolicy;
+    SW(t) = SmltRslt.SW;
+    SE(t) = SmltRslt.SE;
+    MeanSW(t) = SmltRslt.MeanSW;
+    MeanSE(t) = SmltRslt.MeanSE;
+    Profit(t) = SmltRslt.Profit;
+    MeanProfit(t) = SmltRslt.MeanProfit;
     
+    
+    %{
     % updates current jump variables
     bbp = bp;
+    
+    Response(bbp:bbp-1+EpsilonPts*ZetaPts*APts,t) = VfiRslt.EV(:);
+    bbp = bbp+EpsilonPts*ZetaPts*APts;
+    
     Response(bbp:bbp-1+EpsilonPts*ZetaPts*APts,t) = VfiRslt.VWorker(:);
     bbp = bbp+EpsilonPts*ZetaPts*APts;
     
@@ -136,8 +151,10 @@ for t=1:T
     Response(bbp,t) = SmltRslt.w;
     bbp = bbp+1;
     %}
-    % evolution of states, inexact
-    Response(:,t+1) = G1*Response(:,t) + C + impact*shock(:,t);
+    
+    %}
+    % evolution of jumps
+    Response(:,t+1) = Response(:,t+1) + impact*shock(:,t);
     
     % evolution of states, exact
     bp = 1;
@@ -157,4 +174,6 @@ for t=1:T
     bp = bp+1;
     %}
 end
+SimulateResult = v2struct(z,G,Lambda,Tax,B,Ks,Kd,K,Ns,Nd,N,r,w,YE,YF,Y,AGini,EntrePopShare,Kp,ZImplied,DistT,OccPolicyT,...
+    SW,SE,MeanSW,MeanSE,Profit,MeanProfit);
 end

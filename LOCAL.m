@@ -50,9 +50,9 @@ Y = SmltRsltSs.Y;
 EntrePopShare = SmltRsltSs.EntrePopShare;
 
 Ss = [DistSs(:)' z G Lambda B];
-Ss = [Ss VWorkerSs(:)' VManagerSs(:)'];
+Ss = [Ss EVSs(:)' VWorkerSs(:)' VManagerSs(:)'];
 % Ss = [Ss Ks Kd K Ns Nd N r w];
-Ss = [Ss r w];
+Ss = [Ss Ks Kd K Ns Nd N r w Tax EntrePopShare];
 nx = length(Ss);
 nepsilon = 3;
 neta = 2*EpsilonPts*ZetaPts*APts;
@@ -63,17 +63,46 @@ display(max(abs(F(:))));
 Epsilon0 = zeros(1,nepsilon);
 Eta0 = zeros(1,neta);
 
-tic;
+%{
+% diagnostic what relative distance should be used
+min(reshape(abs((VWorkerSs(:,:,2:end) - VWorkerSs(:,:,1:end-1))),1,[]))
+min(reshape(abs((VManagerSs(:,:,2:end) - VManagerSs(:,:,1:end-1))),1,[]))
+min(reshape(abs((EVSs(:,:,2:end) - EVSs(:,:,1:end-1))),1,[]))
+
+min(reshape(abs((VWorkerSs(:,:,2:end) - VWorkerSs(:,:,1:end-1)) ./ VWorkerSs(:,:,1:end-1)),1,[]))
+min(reshape(abs((VManagerSs(:,:,2:end) - VManagerSs(:,:,1:end-1)) ./ VManagerSs(:,:,1:end-1)),1,[]))
+min(reshape(abs((EVSs(:,:,2:end) - EVSs(:,:,1:end-1)) ./ EVSs(:,:,1:end-1)),1,[]))
+%}
+
+% when using autodifferentiation, one should be careful preserving
+% monotonicity
+TypicalVWorker = VWorkerSs(:,:,2:end) - VWorkerSs(:,:,1:end-1);
+TypicalVWorkerForward = cat(3,TypicalVWorker,inf*ones(EpsilonPts,ZetaPts,1));
+TypicalVWorkerBackward = cat(3,inf*ones(EpsilonPts,ZetaPts,1),TypicalVWorker);
+TypicalVWorker = min(TypicalVWorkerForward,TypicalVWorkerBackward);
+
+TypicalVManager = VManagerSs(:,:,2:end) - VManagerSs(:,:,1:end-1);
+TypicalVManagerForward = cat(3,TypicalVManager,inf*ones(EpsilonPts,ZetaPts,1));
+TypicalVManagerBackward = cat(3,inf*ones(EpsilonPts,ZetaPts,1),TypicalVManager);
+TypicalVManager = min(TypicalVManagerForward,TypicalVManagerBackward);
+
+TypicalEV = EVSs(:,:,2:end) - EVSs(:,:,1:end-1);
+TypicalEVForward = cat(3,TypicalEV,inf*ones(EpsilonPts,ZetaPts,1));
+TypicalEVBackward = cat(3,inf*ones(EpsilonPts,ZetaPts,1),TypicalEV);
+TypicalEV = min(TypicalEVForward,TypicalEVBackward);
+
 TypicalX = [max(DistSs(:))*ones(1,EpsilonPts*ZetaPts*APts) z G Lambda B];
-TypicalX = [TypicalX VWorkerSs(:)' VManagerSs(:)'];
-TypicalX = [TypicalX r w];
+TypicalX = [TypicalX TypicalEV(:)' TypicalVWorker(:)' TypicalVManager(:)'];
+% TypicalX = [TypicalX ones(1,3*EpsilonPts*ZetaPts*APts)];
+TypicalX = [TypicalX Ks Kd K Ns Nd N r w Tax EntrePopShare];
 TypicalX = [TypicalX TypicalX ones(1,nepsilon) ones(1,neta)];
 % TypicalX = [ones(1,2*nx) ones(1,nepsilon) ones(1,neta)];
 RelDeltaX = [1e-3*ones(1,EpsilonPts*ZetaPts*APts) 1e-3 1e-3 1e-3 1e-3];
-RelDeltaX = [RelDeltaX 1e-4*ones(1,2*EpsilonPts*ZetaPts*APts)];
-RelDeltaX = [RelDeltaX 1e-3*ones(1,2)];
+RelDeltaX = [RelDeltaX 1e-3*ones(1,EpsilonPts*ZetaPts*APts) 1e-3*ones(1,EpsilonPts*ZetaPts*APts) 1e-3*ones(1,EpsilonPts*ZetaPts*APts)];
+RelDeltaX = [RelDeltaX 1e-3*ones(1,10)];
 RelDeltaX = [RelDeltaX RelDeltaX ones(1,nepsilon) ones(1,neta)];
 assert(numel(TypicalX)==numel(RelDeltaX));
+tic;
 [F,Fp] = AutoDiff(@(x) sys_stack([x(1:nx) x(nx+1:2*nx) x(2*nx+1:2*nx+nepsilon) x(2*nx+nepsilon+1:2*nx+nepsilon+neta)], ...
     nx,nepsilon,neta,Params),[Ss Ss Epsilon0 Eta0],RelDeltaX,'central',TypicalX);
 toc;
@@ -172,13 +201,11 @@ B = X(bp);
 Bl = Xl(bp);
 bp = bp+1;
 
-%{
 EV = X(bp:bp+EpsilonPts*ZetaPts*APts-1);
 EV = reshape(EV,EpsilonPts,ZetaPts,APts);
 EVl = Xl(bp:bp+EpsilonPts*ZetaPts*APts-1);
 EVl = reshape(EVl,EpsilonPts,ZetaPts,APts);
 bp = bp + EpsilonPts*ZetaPts*APts;
-%}
 
 VWorker = X(bp:bp+EpsilonPts*ZetaPts*APts-1);
 VWorker = reshape(VWorker,EpsilonPts,ZetaPts,APts);
@@ -192,7 +219,6 @@ VManagerl = Xl(bp:bp+EpsilonPts*ZetaPts*APts-1);
 VManagerl = reshape(VManagerl,EpsilonPts,ZetaPts,APts);
 bp = bp + EpsilonPts*ZetaPts*APts;
 
-%{
 Ks = X(bp);
 Ksl = Xl(bp);
 bp = bp+1;
@@ -216,7 +242,6 @@ bp = bp+1;
 N = X(bp);
 Nl = Xl(bp);
 bp = bp+1;
-%}
 
 r = X(bp);
 rl = Xl(bp);
@@ -226,20 +251,21 @@ w = X(bp);
 wl = Xl(bp);
 bp = bp+1;
 
+Tax = X(bp);
+Taxl = Xl(bp);
+bp = bp+1;
+
+EntrePopShare = X(bp);
+EntrePopSharel = Xl(bp);
+bp = bp+1;
+
 assert(bp==length(X)+1);
-Taxl = Rho0 + Rho1*Bl + Rho2*Gl;
+% Taxl = Rho0 + Rho1*Bl + Rho2*Gl;
 
 % VfiRslt = VFI_SS(zl,rl,wl,Taxl,Lambdal,TauLBar,TauRBar,TauPiBar,Params,EV,1);
-global VWorkerSs VManagerSs zSs rSs wSs TaxSs LambdaSs VfiRsltSs DistSs
-if ~(isequal(VWorker,VWorkerSs) && isequal(VManager,VManagerSs) && isequal(zl,zSs) && isequal(rl,rSs) && isequal(wl,wSs) && isequal(Taxl,TaxSs) && isequal(Lambdal,LambdaSs))
-    EV = VManager + normcdf((VWorker-VManager)/USigma).*(VWorker-VManager) ...
-        +USigma*normpdf((VWorker-VManager)/USigma);
-    EV = reshape(EV,EpsilonPts,ZetaPts,APts);
-    EV(:,1,:) = VWorker(:,1,:);
-    EV = Beta*EpsilonZetaTrans * reshape(EV, EpsilonPts*ZetaPts, APts);
-    EV = reshape(EV,EpsilonPts,ZetaPts,APts);
+global EVSs zSs rSs wSs TaxSs LambdaSs VfiRsltSs DistSs
+if ~(isequal(EV,EVSs) && isequal(zl,zSs) && isequal(rl,rSs) && isequal(wl,wSs) && isequal(Taxl,TaxSs) && isequal(Lambdal,LambdaSs))
     % solve maximization problem
-    % EV = Beta*EpsilonZetaTrans * reshape(V, EpsilonPts*ZetaPts, APts);
     VfiRslt = VFI_SS(zl,rl,wl,Taxl,Lambdal,TauLBar,TauRBar,TauPiBar,Params,EV,1);
 else
     VfiRslt = VfiRsltSs;
@@ -276,11 +302,13 @@ bp = bp+1;
 %{
 T_EVl = VManagerl + normcdf((VWorkerl-VManagerl)/USigma).*(VWorkerl-VManagerl) ...
     +USigma*normpdf((VWorkerl-VManagerl)/USigma);
+%}
+T_EVl = VWorkerl + log(1 + exp(VManagerl-VWorkerl));
 T_EVl = reshape(T_EVl,EpsilonPts,ZetaPts,APts);
 T_EVl(:,1,:) = VWorkerl(:,1,:);
 T_EVl = Beta*EpsilonZetaTrans * reshape(T_EVl, EpsilonPts*ZetaPts, APts);
 T_EVl = reshape(T_EVl,EpsilonPts,ZetaPts,APts);
-F(bp:bp+EpsilonPts*ZetaPts*APts-1) = reshape(T_EVl-EVl,1,[]);
+F(bp:bp+EpsilonPts*ZetaPts*APts-1) = reshape(T_EVl-EV,1,[]);
 bp = bp+EpsilonPts*ZetaPts*APts;
 %}
 
@@ -290,7 +318,6 @@ bp = bp+EpsilonPts*ZetaPts*APts;
 F(bp:bp+EpsilonPts*ZetaPts*APts-1) = reshape(VfiRslt.VManager-VManagerl,1,[])+eta(EpsilonPts*ZetaPts*APts+1:2*EpsilonPts*ZetaPts*APts);
 bp = bp+EpsilonPts*ZetaPts*APts;
 
-%{
 F(bp) = Ksl - SmltRslt.Ks;
 bp = bp+1;
 
@@ -308,14 +335,19 @@ bp = bp+1;
 
 F(bp) = Nl - SmltRslt.N;
 bp = bp+1;
-%}
 
-KLRatiol = SmltRslt.K/SmltRslt.N;
+KLRatiol = Kl/Nl;
 T_rl = zl*Gamma*KLRatiol^(Gamma-1)-Delta;
 T_wl = zl*(1-Gamma)*KLRatiol^Gamma;
 F(bp) = rl - T_rl;
 bp = bp+1;
 
 F(bp) = wl - T_wl;
+bp = bp+1;
+
+F(bp) = Taxl - (Rho0 + Rho1*Bl + Rho2*Gl);
+bp = bp+1;
+
+F(bp) = EntrePopSharel - SmltRslt.EntrePopShare;
 bp = bp+1;
 end

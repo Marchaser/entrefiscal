@@ -61,6 +61,6 @@ Dist = [];
 % options = optimoptions('lsqnonlin','Display','Iter','FinDiffRelStep',1e-5,'DiffMinChange',1e-6,'TypicalX',x0','TolX',1e-12,'TolFun',1e-20);
 % lsqnonlin(@(x)ComputeMomentsMetric(x)', x0', XLb', XUb', options);
 options = optimset('Display','iter');
-fzero(@ComputeMomentsMetric,[0.979 0.981],options);
+fzero(@ComputeMomentsMetric,[0.980 0.982],options);
 
 end
