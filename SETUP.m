@@ -37,7 +37,6 @@ ZRho = 0.75;
 ZSigma = 0.012;
 % G
 GRho = 0.8909;
-GSigma = 0.02;
 GBar = 0.20;
 BBar = 0.3597*4;
 Rho1 = 0.017;
@@ -85,6 +84,8 @@ LambdaBar = x(9);
 BBar = x(10);
 GBar = x(11);
 clear x;
+
+GSigma = ((1-GRho^2)*0.0010243)^0.5*GBar;
 
 % Beta = 0.981610878232992;
 

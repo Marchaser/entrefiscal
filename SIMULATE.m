@@ -92,15 +92,17 @@ for t=1:T
     % find KLRatio that clears market
     %{
     options = optimset('Display','iter','TolX',eps);
-    KLRatio = fzero(@getKLRatioMetric,[KLRatioMin,KLRatioMax],options);
+    KLRatio = fzero(@getKLRatioMetric,Params.KLRatioBar,options);
     %}
-    options = optimset('Display','iter','DiffMinChange',1e-3);
+    options = optimset('Display','iter','DiffMinChange',1e-3,'MaxFunEvals',inf,'MaxIter',inf,'FinDiffType','central','TolFun',1e-4);
     Resi = 1;
     init = KLRatioLast;
-    while (Resi>1e-2)
+    while (Resi>1e-4)
         init = min(max(init+Params.KLRatioBar*randn,KLRatioMin),KLRatioMax);
         [KLRatio,Resi] = fsolve(@getKLRatioMetric,init,options);
+        fprintf('%d,Failed\n',t);
     end
+    %}
     %{
     KLRatio = CoDoSol(Params.KLRatioBar,@getKLRatioMetric,KLRatioMin,KLRatioMax,[1e-8 1e-8]);
     %}
@@ -123,13 +125,17 @@ for t=1:T
     Kp(t) = Kd(t)+K(t);
     ZImplied(t) = Y(t)/(Kp(t)^Gamma*Ns(t)^(1-Gamma));
     DistT{t} = Dist;
-    OccPolicyT{t} = VfiRslt.OccPolicy;
+    OccPolicyT{t} = reshape(VfiRslt.OccPolicy,EpsilonPts,ZetaPts,APts);
     SW(t) = SmltRslt.SW;
     SE(t) = SmltRslt.SE;
     MeanSW(t) = SmltRslt.MeanSW;
     MeanSE(t) = SmltRslt.MeanSE;
     Profit(t) = SmltRslt.Profit;
     MeanProfit(t) = SmltRslt.MeanProfit;
+    if t>1
+        IKp(t-1) = Kp(t) - Kp(t)*(1-Delta);
+        IKd(t-1) = Kd(t) - Kd(t)*(1-Delta);
+    end
     
     
     %{
